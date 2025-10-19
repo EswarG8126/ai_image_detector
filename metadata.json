@@ -1,0 +1,5 @@
+{
+  "name": "AI Image Detector",
+  "description": "An advanced tool that leverages the Gemini API to analyze images and detect whether they are AI-generated. Upload an image to receive a detailed analysis, including a confidence score and a breakdown of telltale signs.",
+  "requestFramePermissions": []
+}
