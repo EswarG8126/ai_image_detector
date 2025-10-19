@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { AnalysisResultDisplay } from './components/AnalysisResultDisplay';
@@ -8,13 +7,20 @@ import type { AnalysisResult } from './types';
 import { fileToBase64 } from './utils/fileUtils';
 import { GithubIcon } from './components/icons/GithubIcon';
 import { SparklesIcon } from './components/icons/SparklesIcon';
+import { ApiKeyInput } from './components/ApiKeyInput';
 
 const App: React.FC = () => {
+  const [apiKey, setApiKey] = useState<string>(() => sessionStorage.getItem('gemini-api-key') || '');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleApiKeySave = (key: string) => {
+    sessionStorage.setItem('gemini-api-key', key);
+    setApiKey(key);
+  };
 
   const handleFileSelect = useCallback((file: File) => {
     setSelectedFile(file);
@@ -35,7 +41,7 @@ const App: React.FC = () => {
   };
 
   const handleAnalyze = useCallback(async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !apiKey) return;
 
     setIsLoading(true);
     setError(null);
@@ -43,18 +49,29 @@ const App: React.FC = () => {
 
     try {
       const { base64Data, mimeType } = await fileToBase64(selectedFile);
-      const result = await analyzeImageForAI(base64Data, mimeType);
+      const result = await analyzeImageForAI(apiKey, base64Data, mimeType);
       setAnalysisResult(result);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred during analysis.');
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      
+      if (errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID')) {
+        setError('Your API key is invalid. Please enter a valid key.');
+        sessionStorage.removeItem('gemini-api-key');
+        setApiKey(''); // This will force user to re-enter key
+      } else {
+        setError('An error occurred during analysis: ' + errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [selectedFile]);
+  }, [selectedFile, apiKey]);
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
+      // Don't handle paste if we are on the API key screen
+      if (!apiKey) return;
+      
       const items = event.clipboardData?.items;
       if (!items) return;
 
@@ -73,7 +90,11 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('paste', handlePaste);
     };
-  }, [handleFileSelect]);
+  }, [handleFileSelect, apiKey]);
+
+  if (!apiKey) {
+    return <ApiKeyInput onSave={handleApiKeySave} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 flex flex-col items-center justify-between p-4 sm:p-6 lg:p-8">
@@ -120,11 +141,21 @@ const App: React.FC = () => {
         </div>
       </main>
       
-      <footer className="text-center mt-12 text-gray-500">
+      <footer className="w-full max-w-4xl mx-auto text-center mt-12 text-gray-500 flex flex-col sm:flex-row items-center justify-center gap-x-4 gap-y-2">
         <a href="https://github.com/google/generative-ai-docs/tree/main/site/en/gemini-api/docs/get-started/web" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-cyan-400 transition-colors">
             <GithubIcon />
             Powered by the Gemini API
         </a>
+        <span className="hidden sm:inline">|</span>
+        <button
+            onClick={() => {
+                sessionStorage.removeItem('gemini-api-key');
+                setApiKey('');
+            }}
+            className="text-gray-500 hover:text-cyan-400 transition-colors underline-offset-4 hover:underline"
+        >
+            Change API Key
+        </button>
       </footer>
     </div>
   );

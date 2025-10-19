@@ -1,12 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import type { AnalysisResult } from '../types';
-
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const analysisSchema = {
   type: Type.OBJECT,
@@ -36,7 +29,12 @@ const analysisSchema = {
 };
 
 
-export const analyzeImageForAI = async (base64Data: string, mimeType: string): Promise<AnalysisResult> => {
+export const analyzeImageForAI = async (apiKey: string, base64Data: string, mimeType: string): Promise<AnalysisResult> => {
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please provide your Google Gemini API key.");
+  }
+  const ai = new GoogleGenAI({ apiKey });
+  
   const prompt = `You are an expert in digital image forensics, specializing in the detection of AI-generated images. Your task is to meticulously analyze the provided image for any telltale signs of AI generation.
 
   Examine the image for common artifacts, including but not limited to:
@@ -82,9 +80,7 @@ export const analyzeImageForAI = async (base64Data: string, mimeType: string): P
 
   } catch (error) {
     console.error("Error calling Gemini API:", error);
-    if (error instanceof Error && error.message.includes('429')) {
-      throw new Error("API rate limit exceeded. Please try again later.");
-    }
-    throw new Error("Failed to analyze image. The API may be unavailable or the image format is unsupported.");
+    // Re-throw the original error so the UI can handle it specifically (e.g., for invalid API keys)
+    throw error;
   }
 };
